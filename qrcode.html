@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>神秘密室解碼器</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root { --bg: #0f172a; --card: #1e293b; --accent: #8b5cf6; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #f1f5f9; display: flex; justify-content: center; margin: 0; padding-top: 30px; }
+        .container { background: var(--card); padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; }
+        
+        /* 嘲諷圖片樣式 */
+        .meme-img { width: 100%; border-radius: 12px; margin: 15px 0; border: 2px solid var(--accent); }
+        
+        h2 { color: var(--accent); margin-top: 0; }
+        .hidden { display: none; }
+        input { width: 100%; padding: 14px; margin: 15px 0; border: 2px solid #334155; border-radius: 12px; background: #0f172a; color: white; font-size: 16px; box-sizing: border-box; text-align: center; }
+        input:focus { border-color: var(--accent); outline: none; }
+        button { width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        button:active { transform: scale(0.95); }
+        
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-top: 15px; }
+        #display-result { font-size: 38px; margin: 25px 0; color: #4ade80; font-weight: 900; text-shadow: 0 0 15px rgba(74, 222, 128, 0.3); }
+        .logout-link { color: #64748b; font-size: 13px; margin-top: 25px; cursor: pointer; text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="login-zone" class="hidden">
+        <h2>🧐 喔？想偷看？</h2>
+        <p>「咦，難道你以為成功解密了嗎？」</p>
+        
+        <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJ4emZ5Nnd6dzZ6ZzR6ZzR6ZzR6ZzR6ZzR6ZzR6ZzR6ZzR6JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/26ghbWoXv3G6ypo8o/giphy.gif" class="meme-img" alt="Meme">
+        
+        <p style="font-size: 14px; color: #94a3b8;">別白費力氣了，乖乖翻論語吧。<br>（或是去找大美女大帥哥來幫幫你）</p>
+        
+        <input type="password" id="pw" placeholder="通關暗號...">
+        <button onclick="login()">驗證身份</button>
+    </div>
+
+    <div id="main-zone" class="hidden">
+        <div id="scan-view">
+            <h2>🔍 掃描權限已開啟</h2>
+            <p style="color:#94a3b8">現在你可以合法的偷看了</p>
+            <div id="reader"></div>
+        </div>
+        
+        <div id="result-view" class="hidden">
+            <h2>解密結果如下</h2>
+            <div id="display-result">--</div>
+            <button onclick="showScanner()">繼續掃下一個</button>
+        </div>
+
+        <div class="logout-link" onclick="logout()">登出（想再次被揶揄點這裡）</div>
+    </div>
+</div>
+
+<script>
+    const MASTER_PW = "1234"; // 你的密碼
+    
+    // 50 組對照表
+    const MAPPING = {
+        "k8v2": "編號 01", "m7x9": "編號 02", "r4w5": "編號 03", "t1n6": "編號 04", "b9z3": "編號 05",
+        "p2q8": "編號 06", "h5j4": "編號 07", "g3k1": "編號 08", "f7s9": "編號 09", "d2m4": "編號 10",
+        "c6v8": "編號 11", "x1b3": "編號 12", "n9m5": "編號 13", "l4k2": "編號 14", "j7h1": "編號 15",
+        "g9f3": "編號 16", "d5s8": "編號 17", "a2p4": "編號 18", "q6w1": "編號 19", "e9r3": "編號 20",
+        "t5y7": "編號 21", "u1i8": "編號 22", "o4p2": "編號 23", "a9s3": "編號 24", "d7f1": "編號 25",
+        "g6h8": "編號 26", "j2k4": "編號 27", "l9z3": "編號 28", "x5c7": "編號 29", "v1b8": "編號 30",
+        "n4m2": "編號 31", "q9w3": "編號 32", "e7r1": "編號 33", "t6y8": "編號 34", "u2i4": "編號 35",
+        "o9p3": "編號 36", "a5s7": "編號 37", "d1f8": "編號 38", "g4h2": "編號 39", "j9k3": "編號 40",
+        "l7z1": "編號 41", "x6c8": "編號 42", "v2b4": "編號 43", "n5m7": "編號 44", "q1w8": "編號 45",
+        "e4r2": "編號 46", "t9y3": "編號 47", "u7i1": "編號 48", "o6p8": "編號 49", "a2s4": "編號 50"
+    };
+
+    let html5QrCode;
+
+    window.onload = function() {
+        if (localStorage.getItem('isLoggedIn') === 'true') {
+            showMain();
+            checkUrlParam();
+        } else {
+            document.getElementById('login-zone').classList.remove('hidden');
+        }
+    };
+
+    function login() {
+        if (document.getElementById('pw').value === MASTER_PW) {
+            localStorage.setItem('isLoggedIn', 'true');
+            location.reload();
+        } else {
+            alert("笑死，密碼都打不對嗎？");
+            document.getElementById('pw').value = "";
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('isLoggedIn');
+        location.reload();
+    }
+
+    function showMain() {
+        document.getElementById('main-zone').classList.remove('hidden');
+        startScanner();
+    }
+
+    function startScanner() {
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: 250 },
+            (decodedText) => {
+                try {
+                    const url = new URL(decodedText);
+                    const id = url.searchParams.get("id");
+                    processCode(id || decodedText);
+                } catch(e) {
+                    processCode(decodedText);
+                }
+            }
+        ).catch(err => {
+            console.error(err);
+        });
+    }
+
+    function checkUrlParam() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const id = urlParams.get('id');
+        if (id) processCode(id);
+    }
+
+    function processCode(code) {
+        const result = MAPPING[code] || "抓到了！這代碼是假的吧？";
+        document.getElementById('display-result').innerText = result;
+        document.getElementById('scan-view').classList.add('hidden');
+        document.getElementById('result-view').classList.remove('hidden');
+        if (navigator.vibrate) navigator.vibrate(100);
+    }
+
+    function showScanner() {
+        document.getElementById('result-view').classList.add('hidden');
+        document.getElementById('scan-view').classList.remove('hidden');
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+</script>
+</body>
+</html>
