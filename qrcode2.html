@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>龍年刮刮樂：君子解碼器</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root { 
+            --red: #b91c1c; --gold: #fde047; --dark: #7f1d1d; 
+        }
+        body { 
+            font-family: "Microsoft JhengHei", sans-serif; 
+            background: var(--dark); color: #fefce8; 
+            display: flex; justify-content: center; margin: 0; padding-top: 20px;
+        }
+        .container { 
+            background: var(--red); padding: 30px; border-radius: 20px; 
+            width: 90%; max-width: 400px; text-align: center; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6); border: 3px solid var(--gold);
+        }
+        .meme-img { 
+            width: 100%; border-radius: 12px; margin: 15px 0; border: 2px solid var(--gold); 
+        }
+        h2 { color: var(--gold); text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .hidden { display: none; }
+        input { 
+            width: 100%; padding: 14px; margin: 15px 0; border: 2px solid var(--gold); 
+            border-radius: 12px; font-size: 18px; text-align: center; box-sizing: border-box;
+        }
+        button { 
+            width: 100%; padding: 14px; background: var(--gold); color: var(--dark); 
+            border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 18px;
+        }
+        #display-result { font-size: 48px; margin: 20px 0; color: var(--gold); font-weight: 900; }
+        .quote { font-style: italic; font-size: 14px; margin-bottom: 10px; opacity: 0.9; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="login-zone" class="hidden">
+        <h2>🧧 喔？想偷看財運？</h2>
+        <p class="quote">子曰：「人而無信，不知其可也。」<br>意思是你沒密碼就想刮，我看你是在想桃子。</p>
+        
+        <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJ4emZ5Nnd6dzZ6ZzR6ZzR6ZzR6ZzR6ZzR6ZzR6ZzR6ZzR6JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/26ghbWoXv3G6ypo8o/giphy.gif" class="meme-img">
+        
+        <input type="password" id="pw" placeholder="輸入通關紅包口令...">
+        <button onclick="login()">驗證君子身份</button>
+    </div>
+
+    <div id="main-zone" class="hidden">
+        <div id="scan-view">
+            <h2>🔍 君子見利思義</h2>
+            <p>對準刮刮樂，讓財神爺顯靈</p>
+            <div id="reader"></div>
+        </div>
+        
+        <div id="result-view" class="hidden">
+            <h2>💰 財神降臨</h2>
+            <p>此張刮刮樂真身為：</p>
+            <div id="display-result">--</div>
+            <button onclick="showScanner()">下一張，大吉大利</button>
+        </div>
+        <p style="cursor:pointer; font-size:12px; margin-top:20px; opacity:0.6" onclick="logout()">[ 退出系統 / 避嫌 ]</p>
+    </div>
+</div>
+
+<script>
+    const MASTER_PW = "1234"; // 設定你的密碼
+    const MAPPING = {
+        "k8v2": "編號 01", "m7x9": "編號 02", "r4w5": "編號 03", "t1n6": "編號 04", "b9z3": "編號 05",
+        "p2q8": "編號 06", "h5j4": "編號 07", "g3k1": "編號 08", "f7s9": "編號 09", "d2m4": "編號 10",
+        "c6v8": "編號 11", "x1b3": "編號 12", "n9m5": "編號 13", "l4k2": "編號 14", "j7h1": "編號 15",
+        "g9f3": "編號 16", "d5s8": "編號 17", "a2p4": "編號 18", "q6w1": "編號 19", "e9r3": "編號 20",
+        "t5y7": "編號 21", "u1i8": "編號 22", "o4p2": "編號 23", "a9s3": "編號 24", "d7f1": "編號 25",
+        "g6h8": "編號 26", "j2k4": "編號 27", "l9z3": "編號 28", "x5c7": "編號 29", "v1b8": "編號 30",
+        "n4m2": "編號 31", "q9w3": "編號 32", "e7r1": "編號 33", "t6y8": "編號 34", "u2i4": "編號 35",
+        "o9p3": "編號 36", "a5s7": "編號 37", "d1f8": "編號 38", "g4h2": "編號 39", "j9k3": "編號 40",
+        "l7z1": "編號 41", "x6c8": "編號 42", "v2b4": "編號 43", "n5m7": "編號 44", "q1w8": "編號 45",
+        "e4r2": "編號 46", "t9y3": "編號 47", "u7i1": "編號 48", "o6p8": "編號 49", "a2s4": "編號 50"
+    };
+
+    let html5QrCode;
+    window.onload = function() {
+        if (localStorage.getItem('isLoggedIn') === 'true') {
+            showMain();
+            const id = new URLSearchParams(window.location.search).get('id');
+            if (id) processCode(id);
+        } else {
+            document.getElementById('login-zone').classList.remove('hidden');
+        }
+    };
+
+    function login() {
+        if (document.getElementById('pw').value === MASTER_PW) {
+            localStorage.setItem('isLoggedIn', 'true');
+            location.reload();
+        } else {
+            alert("子曰：『朽木不可雕也』，密碼都打錯。");
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('isLoggedIn');
+        location.reload();
+    }
+
+    function showMain() {
+        document.getElementById('main-zone').classList.remove('hidden');
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
+            try { processCode(new URL(text).searchParams.get("id") || text); } catch(e) { processCode(text); }
+        });
+    }
+
+    function processCode(code) {
+        document.getElementById('display-result').innerText = MAPPING[code] || "非禮勿掃";
+        document.getElementById('scan-view').classList.add('hidden');
+        document.getElementById('result-view').classList.remove('hidden');
+        if (navigator.vibrate) navigator.vibrate(100);
+    }
+
+    function showScanner() {
+        document.getElementById('result-view').classList.add('hidden');
+        document.getElementById('scan-view').classList.remove('hidden');
+        window.history.replaceState({}, '', window.location.pathname);
+    }
+</script>
+</body>
+</html>
